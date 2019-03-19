@@ -55,10 +55,8 @@ private[joda] abstract class JodaInstance[DT] extends IsDateTime[DT] {
   override def get[F <: CronField](dateTime: DT, field: F): Either[DateTimeError, Int] = {
     val jodaField = asDateTimeFieldType(field)
     if (isSupported(dateTime, jodaField)) {
-      val offset = if (field == DayOfWeek) -1 else 0
 
       getField(dateTime, jodaField)
-        .map(_ + offset)
         .fold(UnsupportedField(field).asLeft[Int])(_.asRight)
     } else {
       UnsupportedField(field).asLeft
@@ -79,8 +77,8 @@ private[joda] abstract class JodaInstance[DT] extends IsDateTime[DT] {
       field: F,
       value: Int
   ): Either[DateTimeError, DT] = {
-    val offset = if (field == DayOfWeek) 1 else 0
-    setField(dateTime, field, value + offset)
+    val realvalue = if (field == DayOfWeek && value == 0) 7 else value
+    setField(dateTime, field, realvalue)
   }
 
   protected def asPeriod(amount: Int, unit: DateTimeUnit): ReadablePeriod =
@@ -114,6 +112,10 @@ private[joda] abstract class JodaInstance[DT] extends IsDateTime[DT] {
 
 private[joda] final class JodaDateTimeInstance extends JodaInstance[DateTime] {
 
+  private def dayOfWeekCapping(dateTime: DateTime, field: DateTimeFieldType) =
+    if (field == DateTimeFieldType.dayOfWeek()) dateTime.get(field) % 7
+    else dateTime.get(field)
+
   override protected def isSupported(dateTime: DateTime, field: DateTimeFieldType): Boolean =
     dateTime.isSupported(field)
 
@@ -121,7 +123,7 @@ private[joda] final class JodaDateTimeInstance extends JodaInstance[DateTime] {
     Try(dateTime.plus(period)).toOption
 
   override protected def getField(dateTime: DateTime, field: DateTimeFieldType): Option[Int] =
-    if (dateTime.isSupported(field)) Some(dateTime.get(field))
+    if (dateTime.isSupported(field)) Some(dayOfWeekCapping(dateTime, field))
     else None
 
   override protected def setField(
@@ -146,11 +148,15 @@ private[joda] final class JodaDateTimeInstance extends JodaInstance[DateTime] {
 
 private[joda] abstract class JodaLocalBaseInstance[DT <: BaseLocal] extends JodaInstance[DT] {
 
+  private def dayOfWeekCapping(dateTime: DT, field: DateTimeFieldType) =
+    if (field == DateTimeFieldType.dayOfWeek()) dateTime.get(field) % 7
+    else dateTime.get(field)
+
   override protected def isSupported(dateTime: DT, field: DateTimeFieldType): Boolean =
     dateTime.isSupported(field)
 
   override protected def getField(dateTime: DT, field: DateTimeFieldType): Option[Int] =
-    if (dateTime.isSupported(field)) Some(dateTime.get(field))
+    if (dateTime.isSupported(field)) Some(dayOfWeekCapping(dateTime, field))
     else None
 
 }
